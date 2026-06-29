@@ -2,9 +2,12 @@
  * Outages API route.
  *
  * Fetches the Barbados Water Authority "Service Disruptions" RSS feed
- * (server-side, to avoid browser CORS), parses each notice, tags it with the
- * parishes it affects and the kind of work, and returns clean JSON. If the
- * feed can't be reached, it returns realistic seed data so the app still works.
+ * (server-side, to avoid browser CORS), parses each notice, and tags it with
+ * the parishes it affects and the kind of work, returning clean JSON.
+ *
+ * If the feed can't be reached, it returns a 503 (service unavailable) rather
+ * than fake data — the app then shows an honest "can't reach BWA" state. We
+ * never present sample notices as if they were real.
  *
  * No API key required. RSS is a stable, public contract.
  */
@@ -14,15 +17,14 @@ import {
   matchParishes,
   type Outage,
   parseEventWindow,
-  SEED_OUTAGES,
   stripHtml,
 } from "@/lib/outages";
 
 const FEED_URL =
   "https://barbadoswaterauthority.com/category/service-disruptions/feed/";
 
-// Re-fetch the feed at most every 10 minutes.
-export const revalidate = 600;
+// Re-fetch the upstream feed at most every 10 minutes.
+const REVALIDATE_SECONDS = 600;
 
 type RssItem = {
   title?: string;
@@ -67,7 +69,7 @@ export async function GET(): Promise<Response> {
         "User-Agent": "WuhWaterDoing/0.1 (+alpha.gov.bb prototype)",
         Accept: "application/rss+xml, application/xml, text/xml",
       },
-      next: { revalidate },
+      next: { revalidate: REVALIDATE_SECONDS },
     });
     if (!res.ok) throw new Error(`Feed responded ${res.status}`);
 
@@ -81,12 +83,14 @@ export async function GET(): Promise<Response> {
         ? [rawItems]
         : [];
 
-    if (items.length === 0) throw new Error("No items in feed");
-
+    // An empty feed is a valid "no current notices" answer, not an error.
     const outages = items.map(toOutage);
-    return Response.json({ outages, source: "bwa" });
+    return Response.json({ outages });
   } catch {
-    console.warn("Failed to fetch BWA feed; returning seed data");
-    return Response.json({ outages: SEED_OUTAGES, source: "seed" });
+    console.warn("Could not reach the BWA feed; returning 503 (unavailable)");
+    return Response.json(
+      { error: "unavailable" },
+      { status: 503, headers: { "Cache-Control": "no-store" } },
+    );
   }
 }

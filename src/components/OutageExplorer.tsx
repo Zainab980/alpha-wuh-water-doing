@@ -41,7 +41,6 @@ const TYPE_BADGE: Record<OutageType, string> = {
 
 export function OutageExplorer() {
   const [outages, setOutages] = useState<Outage[]>([]);
-  const [source, setSource] = useState<"bwa" | "seed" | null>(null);
   const [now, setNow] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
@@ -51,11 +50,13 @@ export function OutageExplorer() {
   useEffect(() => {
     let live = true;
     fetch("/api/outages")
-      .then((r) => r.json())
-      .then((data: { outages: Outage[]; source: "bwa" | "seed" }) => {
+      .then(async (r) => {
+        if (!r.ok) throw new Error("unavailable");
+        return r.json();
+      })
+      .then((data: { outages: Outage[] }) => {
         if (!live) return;
         setOutages(data.outages);
-        setSource(data.source);
         setNow(Date.now());
       })
       .catch(() => live && setFailed(true))
@@ -115,6 +116,29 @@ export function OutageExplorer() {
     );
   }
 
+  // Honest "service unavailable" state — we never show made-up notices.
+  if (failed) {
+    return (
+      <StatusBanner variant="service-issue">
+        <Text as="p">
+          <span className="font-bold">
+            We can&apos;t reach the Barbados Water Authority right now.
+          </span>{" "}
+          To avoid showing out-of-date or made-up information, notices are paused
+          for the moment. Please try again shortly, or check the{" "}
+          <Link
+            external
+            href="https://barbadoswaterauthority.com/service-disruptions/"
+            variant="secondary"
+          >
+            BWA website
+          </Link>{" "}
+          directly.
+        </Text>
+      </StatusBanner>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Controls */}
@@ -154,22 +178,14 @@ export function OutageExplorer() {
         </StatusBanner>
       )}
 
-      {/* Source + status line */}
+      {/* Status line */}
       {loading ? (
         <Text as="p" className="text-grey-100">
           Loading the latest notices…
         </Text>
-      ) : failed ? (
-        <StatusBanner variant="service-issue">
-          <Text as="p">
-            We could not load the notices right now. Please try again later.
-          </Text>
-        </StatusBanner>
       ) : (
         <Text as="p" className="text-grey-100" size="caption">
-          {source === "bwa"
-            ? "Live from the Barbados Water Authority."
-            : "Showing example notices (we could not reach the BWA just now)."}
+          Live from the Barbados Water Authority.
         </Text>
       )}
 

@@ -1,6 +1,7 @@
 /**
- * Water-outage domain logic: types, parish matching, classification and seed
- * data. Pure (no Node-only imports) so it is safe on the client and the server.
+ * Water-outage domain logic: types, parish matching, classification and the
+ * date/freshness rules. Pure (no Node-only imports) so it is safe on the
+ * client and the server.
  *
  * Live notices come from the Barbados Water Authority RSS feed, parsed in
  * src/app/api/outages/route.ts. https://barbadoswaterauthority.com/category/service-disruptions/feed/
@@ -180,49 +181,4 @@ export function freshnessLabel(o: Outage, nowMs: number): string {
   });
 }
 
-/**
- * Seed notices used when the live BWA feed can't be reached. Modelled on the
- * real feed format so the prototype always shows something sensible.
- */
-export const SEED_OUTAGES: Outage[] = [
-  {
-    id: "seed-1",
-    title: "BWA to Conduct Urgent Repairs at St. Lucy Station",
-    link: "https://barbadoswaterauthority.com/service-disruptions/",
-    published: new Date().toISOString(),
-    summary:
-      "Emergency repairs near Spring Hall, St. Lucy. Residents in Spring Hall and surrounding districts may be without water or experience low pressure until repairs are complete.",
-    parishes: ["saint-lucy"],
-    type: "emergency",
-  },
-  {
-    id: "seed-2",
-    title: "BWA to Install DMA Meter in Mullins, St. Peter",
-    link: "https://barbadoswaterauthority.com/service-disruptions/",
-    published: new Date().toISOString(),
-    summary:
-      "Planned installation in Mullins, St. Peter between 9:00 a.m. and 7:00 p.m. Residents are advised to store water ahead of the shutoff.",
-    parishes: ["saint-peter"],
-    type: "planned",
-  },
-  {
-    id: "seed-3",
-    title: "Connection Work on Hope Road, St. Lucy",
-    link: "https://barbadoswaterauthority.com/service-disruptions/",
-    published: new Date().toISOString(),
-    summary:
-      "Connection work on Hope Road, St. Lucy. Affected areas may be without water during working hours. Service to be restored on completion.",
-    parishes: ["saint-lucy"],
-    type: "planned",
-  },
-  {
-    id: "seed-4",
-    title: "Repairs Affecting Parts of St. Michael",
-    link: "https://barbadoswaterauthority.com/service-disruptions/",
-    published: new Date().toISOString(),
-    summary:
-      "Crews are repairing a main affecting parts of St. Michael. Some customers may notice low pressure while work is ongoing.",
-    parishes: ["saint-michael"],
-    type: "repair",
-  },
-];
+

@@ -13,8 +13,8 @@ it is, and a "store water now" alert when a planned shut-off is coming.
 - **Real data via an open feed.** Notices come from the BWA
   [Service Disruptions RSS feed](https://barbadoswaterauthority.com/category/service-disruptions/feed/),
   fetched and parsed server-side (RSS is a stable public contract, not fragile
-  HTML scraping). If the feed can't be reached, the app shows realistic seed
-  notices so it always works.
+  HTML scraping). If the feed can't be reached, the app shows an honest
+  "can't reach BWA right now" state — it never presents sample data as real.
 - **Map** uses [Leaflet](https://leafletjs.com) + OpenStreetMap tiles (free, no key).
 
 ## Stack
@@ -40,7 +40,7 @@ src/
     layout.tsx              # GovTech header + footer chrome
     page.tsx                # hero + the explorer
     globals.css             # design-system imports + Leaflet sizing
-    api/outages/route.ts    # fetch + parse BWA RSS feed -> JSON (seed fallback)
+    api/outages/route.ts    # fetch + parse BWA RSS feed -> JSON (503 if unreachable)
   components/
     OutageExplorer.tsx      # area picker, map, store-water alert, notice list
     OutageMap.tsx           # Leaflet map (client-only, dynamic import)
