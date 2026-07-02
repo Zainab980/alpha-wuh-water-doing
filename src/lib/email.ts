@@ -89,6 +89,28 @@ export async function sendAlertEmail(opts: {
 }
 
 /**
+ * Demo variant of the alert email — same shape as sendAlertEmail, but clearly
+ * labelled as a demonstration so it can never be mistaken for a real notice.
+ */
+export async function sendDemoAlertEmail(opts: {
+  to: string;
+  areaLabel: string;
+  notice: { title: string; summary: string; link: string };
+  unsubscribeUrl: string;
+}): Promise<boolean> {
+  return deliver({
+    to: opts.to,
+    subject: `[DEMO] Water notice for ${opts.areaLabel}: ${opts.notice.title}`,
+    html: demoAlertHtml(opts),
+    text: demoAlertText(opts),
+    headers: {
+      "List-Unsubscribe": `<${opts.unsubscribeUrl}>`,
+      "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+    },
+  });
+}
+
+/**
  * Ops alert to the team — used when the checker fails. No-op if ADMIN_EMAIL
  * isn't set.
  */
@@ -187,6 +209,45 @@ function alertText(opts: {
   unsubscribeUrl: string;
 }): string {
   return [
+    `Water notice for ${opts.areaLabel}`,
+    "",
+    opts.notice.title,
+    opts.notice.summary,
+    "",
+    `Read the full BWA notice: ${opts.notice.link}`,
+    "",
+    `Unsubscribe: ${opts.unsubscribeUrl}`,
+  ].join("\n");
+}
+
+function demoAlertHtml(opts: {
+  areaLabel: string;
+  notice: { title: string; summary: string; link: string };
+  unsubscribeUrl: string;
+}): string {
+  return renderEmail(`
+    <div style="background:#fff3cd;border:1px solid #e0c040;border-radius:6px;padding:12px 16px;margin:16px 0;font-size:14px;color:#5a4a00;">
+      <strong>DEMONSTRATION</strong> — this is a test of the water-alerts feature, not a real Barbados Water Authority notice.
+    </div>
+    <h1 class="title">Water notice for ${opts.areaLabel}</h1>
+    <div class="callout">
+      <p class="c-label">Notice (demo)</p>
+      <p class="c-value">${opts.notice.title}</p>
+    </div>
+    <p class="intro">${opts.notice.summary}</p>
+    <p style="margin: 24px 0;"><a class="btn" href="${opts.notice.link}">Read the full BWA notice</a></p>
+    <p class="muted">You're getting this because you signed up for water alerts in ${opts.areaLabel}. <a href="${opts.unsubscribeUrl}">Unsubscribe</a>.</p>
+  `);
+}
+
+function demoAlertText(opts: {
+  areaLabel: string;
+  notice: { title: string; summary: string; link: string };
+  unsubscribeUrl: string;
+}): string {
+  return [
+    "DEMONSTRATION — test alert, not a real Barbados Water Authority notice.",
+    "",
     `Water notice for ${opts.areaLabel}`,
     "",
     opts.notice.title,

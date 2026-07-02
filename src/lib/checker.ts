@@ -19,7 +19,7 @@ import { db } from "@/db";
 import { sentAlerts, subscribers } from "@/db/schema";
 import { claimAlert, markAlertSent } from "@/lib/alerts";
 import { fetchOutages } from "@/lib/bwa";
-import { sendAlertEmail } from "@/lib/email";
+import { sendAlertEmail, sendDemoAlertEmail } from "@/lib/email";
 import { isPast, type Outage } from "@/lib/outages";
 import { areaLabelFor } from "@/lib/parishes";
 
@@ -48,7 +48,7 @@ function matchingSubscribers(notice: Outage) {
 }
 
 export async function runAlertCheck(
-  opts: { notices?: Outage[]; dryRun?: boolean } = {},
+  opts: { notices?: Outage[]; dryRun?: boolean; demo?: boolean } = {},
 ): Promise<CheckSummary> {
   const now = Date.now();
   const notices = opts.notices ?? (await fetchOutages());
@@ -110,7 +110,7 @@ export async function runAlertCheck(
   for (let i = 0; i < pending.length; i += SEND_BATCH) {
     const batch = pending.slice(i, i + SEND_BATCH);
     const results = await Promise.allSettled(
-      batch.map((row) => sendOne(row, noticeById)),
+      batch.map((row) => sendOne(row, noticeById, opts.demo ?? false)),
     );
     for (const r of results) {
       if (r.status === "fulfilled" && r.value) sent++;
@@ -132,11 +132,14 @@ type PendingRow = {
 async function sendOne(
   row: PendingRow,
   noticeById: Map<string, Outage>,
+  demo: boolean,
 ): Promise<boolean> {
   const notice = noticeById.get(row.noticeId);
   if (!notice) return false;
 
-  const ok = await sendAlertEmail({
+  // Demo runs use a clearly-labelled template; real notices use the real one.
+  const send = demo ? sendDemoAlertEmail : sendAlertEmail;
+  const ok = await send({
     to: row.email,
     areaLabel: areaLabelFor(row.area),
     notice,
