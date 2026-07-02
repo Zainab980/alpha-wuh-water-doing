@@ -27,3 +27,8 @@ export const PARISHES: Parish[] = [
 export function findParish(value: string): Parish | undefined {
   return PARISHES.find((p) => p.value === value);
 }
+
+/** Human label for a stored area value ("all" or a parish slug). */
+export function areaLabelFor(area: string): string {
+  return area === "all" ? "all of Barbados" : (findParish(area)?.label ?? area);
+}

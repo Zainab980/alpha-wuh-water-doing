@@ -11,6 +11,8 @@ import {
 } from "@govtech-bb/react";
 import dynamic from "next/dynamic";
 import { useEffect, useMemo, useState } from "react";
+import { AlertSignup } from "./AlertSignup";
+import { SubscriptionNotice } from "./SubscriptionNotice";
 import {
   freshnessLabel,
   isCurrentConcern,
@@ -20,6 +22,7 @@ import {
   type OutageType,
 } from "@/lib/outages";
 import { findParish, PARISHES } from "@/lib/parishes";
+import type { Result } from "@/lib/result";
 
 const OutageMap = dynamic(() => import("./OutageMap"), {
   ssr: false,
@@ -39,13 +42,14 @@ const TYPE_BADGE: Record<OutageType, string> = {
   notice: "bg-blue-10 text-blue-100",
 };
 
-export function OutageExplorer() {
+export function OutageExplorer({ flash }: { flash: Result | null }) {
   const [outages, setOutages] = useState<Outage[]>([]);
   const [now, setNow] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
   const [selected, setSelected] = useState("");
   const [locating, setLocating] = useState(false);
+  const [flashDismissed, setFlashDismissed] = useState(false);
 
   useEffect(() => {
     let live = true;
@@ -176,6 +180,20 @@ export function OutageExplorer() {
             or emergency work that may stop the water in {selectedLabel}.
           </Text>
         </StatusBanner>
+      )}
+
+      {/* Email alerts: a result notice (after confirm/unsubscribe), otherwise
+          the sign-up invite. Placed above the notices so it's always seen. */}
+      {flash && !flashDismissed ? (
+        <SubscriptionNotice
+          onDismiss={() => setFlashDismissed(true)}
+          result={flash}
+        />
+      ) : (
+        <AlertSignup
+          selectedArea={selected}
+          selectedLabel={selectedLabel ?? null}
+        />
       )}
 
       {/* Status line */}

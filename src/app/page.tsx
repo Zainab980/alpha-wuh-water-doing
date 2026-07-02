@@ -1,6 +1,8 @@
 import { Heading, Text } from "@govtech-bb/react";
 import type { Metadata } from "next";
+import { cookies } from "next/headers";
 import { OutageExplorer } from "@/components/OutageExplorer";
+import { resultFromFlash } from "@/lib/result";
 
 export const metadata: Metadata = {
   title: "Wuh Water Doing? — Barbados water outages near you",
@@ -8,7 +10,10 @@ export const metadata: Metadata = {
     "See current Barbados Water Authority outages and planned shut-offs on a map. Pick your area to find out if your water is affected and when it should be back.",
 };
 
-export default function HomePage() {
+export default async function HomePage() {
+  const flash = (await cookies()).get("flash")?.value;
+  const result = resultFromFlash(flash);
+
   return (
     <>
       {/* Hero — yellow section */}
@@ -30,7 +35,7 @@ export default function HomePage() {
       <section>
         <div className="container">
           <div className="py-8">
-            <OutageExplorer />
+            <OutageExplorer flash={result} />
           </div>
         </div>
       </section>
