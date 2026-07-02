@@ -1,0 +1,29 @@
+name: Water alerts checker
+
+# A free, professional alternative to Vercel Cron: GitHub triggers this on a
+# schedule and it simply calls the app's checker endpoint. No Vercel cron cost.
+#
+# Requires two repository secrets (Settings → Secrets and variables → Actions):
+#   APP_URL      e.g. https://your-app.vercel.app   (no trailing slash)
+#   CRON_SECRET  the same value set in the app's env (protects the endpoint)
+#
+# Notes: GitHub's minimum interval is 5 minutes and scheduled runs can be
+# delayed a little under load — fine for a ~30-minute water-notice check.
+
+on:
+  schedule:
+    - cron: "*/30 * * * *" # every 30 minutes
+  workflow_dispatch: {} # allow manual runs from the Actions tab
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger the alert checker
+        run: |
+          curl -fsS --max-time 60 \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            "${APP_URL}/api/cron/check-alerts"
+        env:
+          APP_URL: ${{ secrets.APP_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}

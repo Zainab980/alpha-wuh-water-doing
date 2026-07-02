@@ -1,22 +1,29 @@
 /**
- * Email sending via Resend.
+ * Email sending via nodemailer over SMTP.
  *
- * One low-level deliver() sends through Resend. The per-email helpers build the
- * content and call it. deliver() never throws — a mail hiccup can't break a
- * sign-up (the row is already "pending").
+ * One low-level deliver() sends through the configured SMTP transport. The
+ * per-email helpers build the content and call it. deliver() never throws — a
+ * mail hiccup can't break a sign-up (the row is already "pending").
  *
- * Inbox (not spam) is a DELIVERABILITY concern, decided by sender
- * authentication, not by this code: verify your domain in Resend (SPF + DKIM +
- * DMARC) and set EMAIL_FROM to an address on that domain. Sending from the
- * shared test address (onboarding@resend.dev) will tend to land in spam.
+ * Inbox (not spam) is a DELIVERABILITY concern, not a code one: it's decided by
+ * the sending domain's SPF + DKIM + DMARC. Point SMTP at a provider/domain that
+ * is authenticated (and set EMAIL_FROM to an address on it) for inbox delivery.
  */
-import { Resend } from "resend";
+import nodemailer from "nodemailer";
 
-const FROM =
-  process.env.EMAIL_FROM ?? "Wuh Water Doing <onboarding@resend.dev>";
+const FROM = process.env.EMAIL_FROM ?? "Wuh Water Doing <no-reply@wuhwater.bb>";
 
-const resend = process.env.RESEND_API_KEY
-  ? new Resend(process.env.RESEND_API_KEY)
+// Built once from env. Unset SMTP_HOST → no transport (sends are skipped, and
+// sign-ups still succeed).
+const transporter = process.env.SMTP_HOST
+  ? nodemailer.createTransport({
+      host: process.env.SMTP_HOST,
+      port: Number(process.env.SMTP_PORT ?? 587),
+      secure: Number(process.env.SMTP_PORT) === 465, // 465 = TLS; 587/25 = STARTTLS
+      auth: process.env.SMTP_USER
+        ? { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS }
+        : undefined,
+    })
   : null;
 
 type Message = {
@@ -28,12 +35,12 @@ type Message = {
 };
 
 async function deliver(msg: Message): Promise<boolean> {
-  if (!resend) {
-    console.warn("[email] RESEND_API_KEY not set — skipping send");
+  if (!transporter) {
+    console.warn("[email] SMTP not configured (SMTP_HOST unset) — skipping send");
     return false;
   }
   try {
-    const { error } = await resend.emails.send({
+    await transporter.sendMail({
       from: FROM,
       to: msg.to,
       subject: msg.subject,
@@ -41,13 +48,9 @@ async function deliver(msg: Message): Promise<boolean> {
       text: msg.text,
       headers: msg.headers,
     });
-    if (error) {
-      console.error("[email] Resend rejected:", error);
-      return false;
-    }
     return true;
   } catch (err) {
-    console.error("[email] Resend threw:", err);
+    console.error("[email] SMTP send failed:", err);
     return false;
   }
 }
