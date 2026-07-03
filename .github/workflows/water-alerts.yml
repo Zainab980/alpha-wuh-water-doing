@@ -21,9 +21,10 @@ jobs:
     steps:
       - name: Trigger the alert checker
         run: |
-          curl -fsS --max-time 60 \
+          BASE="${APP_URL%/}"   # strip any trailing slash so we don't 308-redirect
+          curl -fsSL --max-time 60 \
             -H "Authorization: Bearer ${CRON_SECRET}" \
-            "${APP_URL}/api/cron/check-alerts"
+            "${BASE}/api/cron/check-alerts"
         env:
           APP_URL: ${{ secrets.APP_URL }}
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
