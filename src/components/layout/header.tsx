@@ -2,7 +2,9 @@ import { Link, Logo, OfficialBanner, StatusBanner, Text } from "@govtech-bb/reac
 import NextLink from "next/link";
 
 export const Header = () => (
-  <div>
+  // One <header> banner landmark wrapping the official banner, alpha notice,
+  // and logo — so no top-of-page content sits outside a landmark.
+  <header>
     <div className="bg-blue-100">
       <div className="container">
         <OfficialBanner
@@ -26,7 +28,7 @@ export const Header = () => (
         </StatusBanner>
       </div>
     </div>
-    <header className="relative bg-yellow-100">
+    <div className="relative bg-yellow-100">
       <div className="container">
         <div className="flex items-center gap-3 py-4 lg:py-6">
           <Link aria-label="Go to the water notices home" as={NextLink} href="/">
@@ -34,6 +36,6 @@ export const Header = () => (
           </Link>
         </div>
       </div>
-    </header>
-  </div>
+    </div>
+  </header>
 );
