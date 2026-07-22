@@ -169,7 +169,7 @@ export function isCurrentConcern(o: Outage, nowMs: number): boolean {
 
 /** Short human label: "Today", "Tomorrow", "Over", or "23 Jun". */
 export function freshnessLabel(o: Outage, nowMs: number): string {
-  if (isPast(o, nowMs)) return "Over";
+  if (isPast(o, nowMs)) return "Ended";
   const key = o.eventDay ?? bbDayKey(new Date(o.published));
   if (key === bbDayKey(new Date(nowMs))) return "Today";
   if (key === bbDayKey(new Date(nowMs + 86_400_000))) return "Tomorrow";

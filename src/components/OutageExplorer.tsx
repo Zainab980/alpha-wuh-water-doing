@@ -50,6 +50,7 @@ export function OutageExplorer({ flash }: { flash: Result | null }) {
   const [selected, setSelected] = useState("");
   const [locating, setLocating] = useState(false);
   const [flashDismissed, setFlashDismissed] = useState(false);
+  const [checkedAt, setCheckedAt] = useState<string | null>(null);
 
   useEffect(() => {
     let live = true;
@@ -58,9 +59,10 @@ export function OutageExplorer({ flash }: { flash: Result | null }) {
         if (!r.ok) throw new Error("unavailable");
         return r.json();
       })
-      .then((data: { outages: Outage[] }) => {
+      .then((data: { outages: Outage[]; checkedAt?: string }) => {
         if (!live) return;
         setOutages(data.outages);
+        setCheckedAt(data.checkedAt ?? null);
         setNow(Date.now());
       })
       .catch(() => live && setFailed(true))
@@ -149,7 +151,7 @@ export function OutageExplorer({ flash }: { flash: Result | null }) {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
         <div className="flex-1">
           <Select
-            label="Choose your area"
+            label="Choose a parish"
             onChange={(e) => setSelected(e.target.value)}
             value={selected}
           >
@@ -166,6 +168,10 @@ export function OutageExplorer({ flash }: { flash: Result | null }) {
           {locating ? "Finding you…" : "Use my location"}
         </Button>
       </div>
+
+      <Text as="p" className="text-grey-100" size="caption">
+        We use your location to find your parish. We do not store it.
+      </Text>
 
       {/* Map */}
       <div className="h-[420px] overflow-hidden rounded-md border-2 border-grey-00">
@@ -203,7 +209,8 @@ export function OutageExplorer({ flash }: { flash: Result | null }) {
         </Text>
       ) : (
         <Text as="p" className="text-grey-100" size="caption">
-          Live from the Barbados Water Authority.
+          Notices published by the Barbados Water Authority.
+          {checkedAt ? ` Last checked: ${formatCheckedAt(checkedAt)}.` : ""}
         </Text>
       )}
 
@@ -217,10 +224,22 @@ export function OutageExplorer({ flash }: { flash: Result | null }) {
           </Heading>
 
           {visibleActive.length === 0 ? (
-            <div className="rounded-md bg-green-10 p-6">
+            <div className="rounded-md bg-blue-10 p-6">
               <Text as="p">
-                Good news. There are no current water notices
-                {selectedLabel ? ` for ${selectedLabel}` : ""}.
+                There are no current BWA notices
+                {selectedLabel ? ` for ${selectedLabel}` : ""}. If you have no
+                water, the BWA may not have published a notice yet.
+              </Text>
+              <Text as="p" className="mt-2">
+                No notice for your area?{" "}
+                <Link
+                  external
+                  href="https://barbadoswaterauthority.com/contact-us/"
+                  variant="secondary"
+                >
+                  Report a water outage to the BWA
+                </Link>{" "}
+                (or call 246-434-4292).
               </Text>
             </div>
           ) : (
@@ -242,12 +261,13 @@ export function OutageExplorer({ flash }: { flash: Result | null }) {
             </>
           )}
 
-          {/* Already-over notices, tucked away */}
+          {/* Past notices, tucked away */}
           {visiblePast.length > 0 && (
-            <ShowHide
-              summary={`Older notices that are already over (${visiblePast.length})`}
-            >
+            <ShowHide summary={`Past notices (${visiblePast.length})`}>
               <div className="space-y-4 pt-2">
+                <Text as="p" className="text-grey-100" size="caption">
+                  View notices that have ended.
+                </Text>
                 {visiblePast.map((o) => (
                   <OutageCard key={o.id} now={now} outage={o} />
                 ))}
@@ -262,7 +282,7 @@ export function OutageExplorer({ flash }: { flash: Result | null }) {
 
 function OutageCard({ outage, now }: { outage: Outage; now: number }) {
   const fresh = freshnessLabel(outage, now);
-  const over = fresh === "Over";
+  const over = fresh === "Ended";
 
   return (
     <div
@@ -292,7 +312,12 @@ function OutageCard({ outage, now }: { outage: Outage; now: number }) {
         </Text>
       )}
       <div className="mt-3">
-        <Link external href={outage.link} variant="secondary">
+        <Link
+          aria-label={`Read the BWA notice about ${outage.title}`}
+          external
+          href={outage.link}
+          variant="secondary"
+        >
           Read the BWA notice
         </Link>
       </div>
@@ -306,6 +331,21 @@ function formatDate(iso: string): string {
       day: "numeric",
       month: "short",
       year: "numeric",
+    });
+  } catch {
+    return "";
+  }
+}
+
+function formatCheckedAt(iso: string): string {
+  try {
+    return new Date(iso).toLocaleString("en-GB", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      timeZone: "America/Barbados",
     });
   } catch {
     return "";

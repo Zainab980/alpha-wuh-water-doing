@@ -1,6 +1,6 @@
 "use client";
 
-import { Button, Input, Select, StatusBanner, Text } from "@govtech-bb/react";
+import { Button, Input, Link, Select, StatusBanner, Text } from "@govtech-bb/react";
 import { useState } from "react";
 import { PARISHES } from "@/lib/parishes";
 
@@ -76,11 +76,19 @@ export function AlertSignup({
     return (
       <div className="rounded-md border-2 border-blue-40 bg-blue-10 p-6">
         <Text as="p" className="font-semibold">
-          Get an email when water is affected {headlinePlace}.
+          Get email alerts
+        </Text>
+        <Text as="p" className="mt-1">
+          Get an email when the Barbados Water Authority publishes a water
+          notice {headlinePlace}. We'll only use your email to send these
+          alerts, and you can unsubscribe at any time.
         </Text>
         <Text as="p" className="mt-1 text-grey-100" size="caption">
-          We only keep your email and chosen area, and you can unsubscribe from
-          any alert. No login needed.
+          Read our{" "}
+          <Link external href="https://alpha.gov.bb/privacy" variant="secondary">
+            privacy notice
+          </Link>
+          .
         </Text>
         <div className="mt-4">
           <Button onClick={openForm} variant="primary">
@@ -102,6 +110,8 @@ export function AlertSignup({
       </Text>
 
       <Input
+        // biome-ignore lint/a11y/noAutofocus: focus the first field when the form opens
+        autoFocus
         error={emailError}
         label="Your email address"
         onChange={(e) => setEmail(e.target.value)}
@@ -110,7 +120,7 @@ export function AlertSignup({
       />
 
       <Select
-        label="Which area?"
+        label="Area for alerts"
         onChange={(e) => setArea(e.target.value)}
         value={area}
       >
@@ -122,6 +132,14 @@ export function AlertSignup({
         ))}
       </Select>
 
+      <Text as="p" className="text-grey-100" size="caption">
+        We'll only use your email to send these alerts. Read our{" "}
+        <Link external href="https://alpha.gov.bb/privacy" variant="secondary">
+          privacy notice
+        </Link>
+        .
+      </Text>
+
       {status === "error" && (
         <StatusBanner variant="service-issue">
           <Text as="p">
@@ -132,7 +150,7 @@ export function AlertSignup({
 
       <div className="flex gap-3">
         <Button disabled={status === "sending"} type="submit" variant="primary">
-          {status === "sending" ? "Sending…" : "Send me alerts"}
+          {status === "sending" ? "Sending…" : "Get email alerts"}
         </Button>
         <Button onClick={() => setOpen(false)} type="button" variant="tertiary">
           Cancel

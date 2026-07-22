@@ -10,7 +10,7 @@ import { fetchOutages } from "@/lib/bwa";
 export async function GET(): Promise<Response> {
   try {
     const outages = await fetchOutages();
-    return Response.json({ outages });
+    return Response.json({ outages, checkedAt: new Date().toISOString() });
   } catch {
     console.warn("Could not reach the BWA feed; returning 503 (unavailable)");
     return Response.json(
