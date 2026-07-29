@@ -21,6 +21,7 @@ import {
   OUTAGE_TYPE_LABEL,
   type OutageType,
 } from "@/lib/outages";
+import { locateParish } from "@/lib/geo";
 import { findParish, PARISHES } from "@/lib/parishes";
 import type { Result } from "@/lib/result";
 
@@ -49,6 +50,11 @@ export function OutageExplorer({ flash }: { flash: Result | null }) {
   const [failed, setFailed] = useState(false);
   const [selected, setSelected] = useState("");
   const [locating, setLocating] = useState(false);
+  const [locationError, setLocationError] = useState(false);
+  const [locatedParish, setLocatedParish] = useState<string | null>(null);
+  // Whether the located parish came from a boundary hit (true) or a nearest-
+  // centroid fallback (false) — drives how confidently we word the note.
+  const [locatedExact, setLocatedExact] = useState(false);
   const [flashDismissed, setFlashDismissed] = useState(false);
   const [checkedAt, setCheckedAt] = useState<string | null>(null);
 
@@ -93,12 +99,17 @@ export function OutageExplorer({ flash }: { flash: Result | null }) {
     return map;
   }, [active]);
 
-  const byArea = (list: Outage[]) =>
-    selected ? list.filter((o) => o.parishes.includes(selected)) : list;
-
-  const visibleActive = byArea(active);
-  const visiblePast = byArea(past);
-  const unmatched = active.filter((o) => o.parishes.length === 0);
+  // Parish-tied notices: filtered by the chosen parish, or (when nothing is
+  // chosen) every notice that names at least one parish. General notices — the
+  // ones the BWA text didn't tie to a parish — are handled separately below so
+  // they never disappear when a parish is selected.
+  const visibleActive = selected
+    ? active.filter((o) => o.parishes.includes(selected))
+    : active.filter((o) => o.parishes.length > 0);
+  const visiblePast = selected
+    ? past.filter((o) => o.parishes.includes(selected))
+    : past;
+  const general = active.filter((o) => o.parishes.length === 0);
 
   const selectedLabel = selected ? findParish(selected)?.label : null;
 
@@ -108,16 +119,45 @@ export function OutageExplorer({ flash }: { flash: Result | null }) {
     now != null &&
     visibleActive.some((o) => o.type !== "notice" && isCurrentConcern(o, now));
 
+  // Manual parish choice (dropdown or map): clears any location state so the
+  // "we couldn't locate you" banner and the location estimate note go away.
+  function chooseParish(value: string) {
+    setSelected(value);
+    setLocationError(false);
+    setLocatedParish(null);
+  }
+
   function useMyLocation() {
-    if (!navigator.geolocation) return;
+    if (!navigator.geolocation) {
+      setLocationError(true);
+      return;
+    }
     setLocating(true);
+    setLocationError(false);
+    setLocatedParish(null);
     navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        const nearest = nearestParish(pos.coords.latitude, pos.coords.longitude);
-        if (nearest) setSelected(nearest);
+      async (pos) => {
+        // Boundary-accurate: which parish actually contains this position?
+        // Falls back to the nearest parish for readings just off the coast.
+        const located = await locateParish(
+          pos.coords.latitude,
+          pos.coords.longitude,
+        );
+        if (located) {
+          setSelected(located.value);
+          setLocatedParish(located.value);
+          setLocatedExact(located.exact);
+        } else {
+          setLocationError(true);
+        }
         setLocating(false);
       },
-      () => setLocating(false),
+      // Denied, timed out, or otherwise unavailable — tell the user and point
+      // them at the parish picker instead of failing silently.
+      () => {
+        setLocationError(true);
+        setLocating(false);
+      },
       { timeout: 8000 },
     );
   }
@@ -152,7 +192,7 @@ export function OutageExplorer({ flash }: { flash: Result | null }) {
         <div className="flex-1">
           <Select
             label="Choose a parish"
-            onChange={(e) => setSelected(e.target.value)}
+            onChange={(e) => chooseParish(e.target.value)}
             value={selected}
           >
             <option value="">All of Barbados</option>
@@ -173,9 +213,45 @@ export function OutageExplorer({ flash }: { flash: Result | null }) {
         We use your location to find your parish. We do not store it.
       </Text>
 
+      {/* Location could not be used — denied, timed out, or unsupported. */}
+      {locationError && (
+        <StatusBanner variant="service-issue">
+          <Text as="p">
+            We could not use your location. Choose a parish instead.
+          </Text>
+        </StatusBanner>
+      )}
+
+      {/* Location succeeded. A boundary hit is confident; a fallback to the
+          nearest parish (e.g. a reading off the coast) is flagged as a guess. */}
+      {locatedParish && selected === locatedParish && (
+        <div className="rounded-md bg-blue-10 p-4">
+          <Text as="p">
+            {locatedExact ? (
+              <>
+                Based on your location, you&apos;re in{" "}
+                <span className="font-bold">
+                  {findParish(locatedParish)?.label}
+                </span>
+                . If that&apos;s not right, choose your parish above.
+              </>
+            ) : (
+              <>
+                We couldn&apos;t pin your exact parish, so we&apos;ve picked the
+                closest one:{" "}
+                <span className="font-bold">
+                  {findParish(locatedParish)?.label}
+                </span>
+                . Please check it&apos;s right, or choose your parish above.
+              </>
+            )}
+          </Text>
+        </div>
+      )}
+
       {/* Map */}
       <div className="h-[420px] overflow-hidden rounded-md border-2 border-grey-00">
-        <OutageMap counts={counts} onSelect={setSelected} selected={selected} />
+        <OutageMap counts={counts} onSelect={chooseParish} selected={selected} />
       </div>
 
       {/* Store-water alert */}
@@ -227,19 +303,10 @@ export function OutageExplorer({ flash }: { flash: Result | null }) {
             <div className="rounded-md bg-blue-10 p-6">
               <Text as="p">
                 There are no current BWA notices
-                {selectedLabel ? ` for ${selectedLabel}` : ""}. If you have no
-                water, the BWA may not have published a notice yet.
-              </Text>
-              <Text as="p" className="mt-2">
-                No notice for your area?{" "}
-                <Link
-                  external
-                  href="https://barbadoswaterauthority.com/contact-us/"
-                  variant="secondary"
-                >
-                  Report a water outage to the BWA
-                </Link>{" "}
-                (or call 246-434-4292).
+                {selectedLabel ? ` for ${selectedLabel}` : ""}.
+                {general.length > 0
+                  ? " See the general notices below, which may still affect you."
+                  : " If you have no water, the BWA may not have published a notice yet."}
               </Text>
             </div>
           ) : (
@@ -248,18 +315,37 @@ export function OutageExplorer({ flash }: { flash: Result | null }) {
             ))
           )}
 
-          {/* Notices with no single parish, only when not filtering */}
-          {!selected && unmatched.length > 0 && (
+          {/* General notices — not tied to a single parish. Always shown, even
+              when a parish is selected, so they never silently disappear. */}
+          {general.length > 0 && (
             <>
-              <Heading as="h3">Other notices</Heading>
+              <Heading as="h3">General notices</Heading>
               <Text as="p" className="text-grey-100" size="caption">
-                These notices did not name a single parish.
+                These affect areas the BWA did not tie to a single parish, so
+                they may still apply to you.
               </Text>
-              {unmatched.map((o) => (
+              {general.map((o) => (
                 <OutageCard key={o.id} now={now} outage={o} />
               ))}
             </>
           )}
+
+          {/* Report option — always available once results load. A parish-wide
+              notice may not cover the user's specific street. */}
+          <div className="rounded-md bg-blue-10 p-4">
+            <Text as="p">
+              Water problem not listed here? A notice may not cover your exact
+              area.{" "}
+              <Link
+                external
+                href="https://barbadoswaterauthority.com/contact-us/"
+                variant="secondary"
+              >
+                Report a water outage to the BWA
+              </Link>{" "}
+              (or call 246-434-4292).
+            </Text>
+          </div>
 
           {/* Past notices, tucked away */}
           {visiblePast.length > 0 && (
@@ -350,17 +436,4 @@ function formatCheckedAt(iso: string): string {
   } catch {
     return "";
   }
-}
-
-function nearestParish(lat: number, lon: number): string | null {
-  let best: string | null = null;
-  let bestDist = Infinity;
-  for (const p of PARISHES) {
-    const d = (p.lat - lat) ** 2 + (p.lon - lon) ** 2;
-    if (d < bestDist) {
-      bestDist = d;
-      best = p.value;
-    }
-  }
-  return best;
 }
