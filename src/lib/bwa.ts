@@ -8,6 +8,7 @@
 import { XMLParser } from "fast-xml-parser";
 import {
   classifyType,
+  clip,
   matchParishes,
   type Outage,
   parseEventWindow,
@@ -47,7 +48,7 @@ function toOutage(item: RssItem, index: number): Outage {
     title: stripHtml(title),
     link: item.link ?? FEED_URL,
     published,
-    summary: body.slice(0, 280),
+    summary: clip(body, 280),
     parishes: matchParishes(haystack),
     type: classifyType(haystack),
     eventDay,

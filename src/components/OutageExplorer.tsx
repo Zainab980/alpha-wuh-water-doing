@@ -254,12 +254,14 @@ export function OutageExplorer({ flash }: { flash: Result | null }) {
         <OutageMap counts={counts} onSelect={chooseParish} selected={selected} />
       </div>
 
-      {/* Store-water alert */}
+      {/* Store-water advisory — softened: parish-wide work may not affect
+          everyone, so we say "some parts" and "may", not "store water now". */}
       {showStoreWater && (
         <StatusBanner variant="service-issue">
           <Text as="p">
-            <span className="font-bold">Store water now.</span> There is planned
-            or emergency work that may stop the water in {selectedLabel}.
+            Some parts of {selectedLabel} may have no water or low water
+            pressure. You may need to store some water in case your water goes
+            off.
           </Text>
         </StatusBanner>
       )}

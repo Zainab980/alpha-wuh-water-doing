@@ -34,16 +34,56 @@ export const OUTAGE_TYPE_LABEL: Record<OutageType, string> = {
   notice: "Notice",
 };
 
-/** Strip HTML tags and collapse whitespace to a plain-text snippet. */
+const NAMED_ENTITIES: Record<string, string> = {
+  amp: "&",
+  lt: "<",
+  gt: ">",
+  quot: '"',
+  apos: "'",
+  nbsp: " ",
+};
+
+function fromCodePoint(n: number): string {
+  try {
+    return String.fromCodePoint(n);
+  } catch {
+    return "";
+  }
+}
+
+/**
+ * Decode HTML entities to real characters: numeric (e.g. `&#038;`, `&#x26;`)
+ * and the common named ones. BWA's feed encodes "&" as `&#038;`, which would
+ * otherwise show up verbatim in titles.
+ */
+export function decodeEntities(text: string): string {
+  return text
+    .replace(/&#x([0-9a-f]+);/gi, (_, hex) => fromCodePoint(parseInt(hex, 16)))
+    .replace(/&#(\d+);/g, (_, dec) => fromCodePoint(parseInt(dec, 10)))
+    .replace(/&([a-z]+);/gi, (whole, name) => NAMED_ENTITIES[name.toLowerCase()] ?? whole);
+}
+
+/** Strip HTML tags, decode entities, and collapse whitespace to plain text. */
 export function stripHtml(html: string): string {
-  return html
-    .replace(/<[^>]*>/g, " ")
-    .replace(/&nbsp;/g, " ")
-    .replace(/&amp;/g, "&")
-    .replace(/&#8217;|&#8216;/g, "'")
-    .replace(/&#8211;|&#8212;/g, "-")
+  return decodeEntities(html.replace(/<[^>]*>/g, " "))
     .replace(/\s+/g, " ")
     .trim();
+}
+
+/**
+ * Trim text to at most `max` characters on a word boundary, adding an ellipsis
+ * when it was actually shortened — so previews never stop mid-word. Readers can
+ * open the full BWA notice for the rest.
+ */
+export function clip(text: string, max: number): string {
+  if (text.length <= max) return text;
+  const slice = text.slice(0, max);
+  const lastSpace = slice.lastIndexOf(" ");
+  const trimmed = (lastSpace > 0 ? slice.slice(0, lastSpace) : slice).replace(
+    /[\s.,;:!?—–-]+$/,
+    "",
+  );
+  return `${trimmed}…`;
 }
 
 /** Guess the kind of notice from its wording. */
