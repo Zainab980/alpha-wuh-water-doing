@@ -4,10 +4,8 @@
  * alert flow on demand (including on the hosted app) without waiting for a real
  * BWA notice.
  *
- * Protected by CRON_SECRET (the same secret as the cron endpoint): the /demo
- * page collects it from you and sends it as a Bearer header, so this works on
- * the deployed site without exposing the secret in client code. If CRON_SECRET
- * is unset (local dev), it's open.
+ * Open endpoint (no auth) — it only ever sends the clearly-labelled DEMO
+ * template to confirmed subscribers, so triggering it just replays the demo.
  */
 import { runAlertCheck } from "@/lib/checker";
 import type { Outage } from "@/lib/outages";
@@ -30,12 +28,7 @@ function demoNotice(): Outage {
   };
 }
 
-export async function GET(req: Request): Promise<Response> {
-  const secret = process.env.CRON_SECRET;
-  if (secret && req.headers.get("authorization") !== `Bearer ${secret}`) {
-    return new Response("Unauthorized", { status: 401 });
-  }
-
+export async function GET(): Promise<Response> {
   try {
     const summary = await runAlertCheck({
       notices: [demoNotice()],

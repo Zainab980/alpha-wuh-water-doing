@@ -3,9 +3,7 @@
  *
  * Reads the live BWA feed, matches confirmed subscribers, and emails each new
  * notice once (real branded template). Called by the GitHub Actions workflow
- * (.github/workflows/water-alerts.yml). CRON_SECRET-protected: the workflow
- * sends `Authorization: Bearer <CRON_SECRET>`; if the secret is unset the
- * endpoint is open (dev only).
+ * (.github/workflows/water-alerts.yml). Open endpoint — no auth.
  *
  * For demos, use /api/demo instead (a labelled demo notice + demo template).
  *
@@ -18,11 +16,6 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 export async function GET(req: Request): Promise<Response> {
-  const secret = process.env.CRON_SECRET;
-  if (secret && req.headers.get("authorization") !== `Bearer ${secret}`) {
-    return new Response("Unauthorized", { status: 401 });
-  }
-
   const dryRun = new URL(req.url).searchParams.get("dryRun") === "1";
 
   try {
