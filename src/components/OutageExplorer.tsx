@@ -21,6 +21,7 @@ import {
   OUTAGE_TYPE_LABEL,
   type OutageType,
 } from "@/lib/outages";
+import { locateParish } from "@/lib/geo";
 import { findParish, PARISHES } from "@/lib/parishes";
 import type { Result } from "@/lib/result";
 
@@ -51,6 +52,9 @@ export function OutageExplorer({ flash }: { flash: Result | null }) {
   const [locating, setLocating] = useState(false);
   const [locationError, setLocationError] = useState(false);
   const [locatedParish, setLocatedParish] = useState<string | null>(null);
+  // Whether the located parish came from a boundary hit (true) or a nearest-
+  // centroid fallback (false) — drives how confidently we word the note.
+  const [locatedExact, setLocatedExact] = useState(false);
   const [flashDismissed, setFlashDismissed] = useState(false);
   const [checkedAt, setCheckedAt] = useState<string | null>(null);
 
@@ -132,11 +136,17 @@ export function OutageExplorer({ flash }: { flash: Result | null }) {
     setLocationError(false);
     setLocatedParish(null);
     navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        const nearest = nearestParish(pos.coords.latitude, pos.coords.longitude);
-        if (nearest) {
-          setSelected(nearest);
-          setLocatedParish(nearest);
+      async (pos) => {
+        // Boundary-accurate: which parish actually contains this position?
+        // Falls back to the nearest parish for readings just off the coast.
+        const located = await locateParish(
+          pos.coords.latitude,
+          pos.coords.longitude,
+        );
+        if (located) {
+          setSelected(located.value);
+          setLocatedParish(located.value);
+          setLocatedExact(located.exact);
         } else {
           setLocationError(true);
         }
@@ -200,7 +210,7 @@ export function OutageExplorer({ flash }: { flash: Result | null }) {
       </div>
 
       <Text as="p" className="text-grey-100" size="caption">
-        We use your location to estimate your parish. We do not store it.
+        We use your location to find your parish. We do not store it.
       </Text>
 
       {/* Location could not be used — denied, timed out, or unsupported. */}
@@ -212,14 +222,29 @@ export function OutageExplorer({ flash }: { flash: Result | null }) {
         </StatusBanner>
       )}
 
-      {/* Location succeeded — an estimate, not a guarantee. Be upfront. */}
+      {/* Location succeeded. A boundary hit is confident; a fallback to the
+          nearest parish (e.g. a reading off the coast) is flagged as a guess. */}
       {locatedParish && selected === locatedParish && (
         <div className="rounded-md bg-blue-10 p-4">
           <Text as="p">
-            Based on your location, you&apos;re likely in{" "}
-            <span className="font-bold">{findParish(locatedParish)?.label}</span>.
-            This is our best estimate — if it&apos;s not right, choose your
-            parish above.
+            {locatedExact ? (
+              <>
+                Based on your location, you&apos;re in{" "}
+                <span className="font-bold">
+                  {findParish(locatedParish)?.label}
+                </span>
+                . If that&apos;s not right, choose your parish above.
+              </>
+            ) : (
+              <>
+                We couldn&apos;t pin your exact parish, so we&apos;ve picked the
+                closest one:{" "}
+                <span className="font-bold">
+                  {findParish(locatedParish)?.label}
+                </span>
+                . Please check it&apos;s right, or choose your parish above.
+              </>
+            )}
           </Text>
         </div>
       )}
@@ -411,17 +436,4 @@ function formatCheckedAt(iso: string): string {
   } catch {
     return "";
   }
-}
-
-function nearestParish(lat: number, lon: number): string | null {
-  let best: string | null = null;
-  let bestDist = Infinity;
-  for (const p of PARISHES) {
-    const d = (p.lat - lat) ** 2 + (p.lon - lon) ** 2;
-    if (d < bestDist) {
-      bestDist = d;
-      best = p.value;
-    }
-  }
-  return best;
 }
